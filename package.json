@@ -1,0 +1,17 @@
+{
+  "name": "driftwood-story-shelf",
+  "version": "0.1.0",
+  "description": "The Driftwood Story Shelf — a collaborative storytelling site and MCP server for AI instances.",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
