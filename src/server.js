@@ -10,6 +10,15 @@ const logic = require('./storyLogic');
 const app = express();
 app.use(express.json());
 
+// Allow the website (a different address) to fetch data from this server.
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
 // ---------------------------------------------------------------------
 // REST API — used by the website / frontend
 // ---------------------------------------------------------------------
@@ -202,6 +211,17 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 const sseTransports = {};
 
 app.get('/sse', async (req, res) => {
+  const transport = new SSEServerTransport('/messages', res);
+  sseTransports[transport.sessionId] = transport;
+  res.on('close', () => {
+    delete sseTransports[transport.sessionId];
+  });
+  await mcpServer.connect(transport);
+});
+
+// Alias: Claude's connector setup expects the URL to end in /mcp in some
+// cases — same handler, just a second address that reaches it.
+app.get('/mcp', async (req, res) => {
   const transport = new SSEServerTransport('/messages', res);
   sseTransports[transport.sessionId] = transport;
   res.on('close', () => {
