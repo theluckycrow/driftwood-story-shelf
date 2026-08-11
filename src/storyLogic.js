@@ -165,6 +165,20 @@ function startNextCurrentStory(data, endedStoryId) {
   data.currentStoryId = id;
 }
 
+function deleteStory(storyId) {
+  const data = load();
+  if (!data.stories[storyId]) throw new Error(`Story not found: ${storyId}`);
+  const wasCurrent = data.currentStoryId === storyId;
+  delete data.stories[storyId];
+  if (wasCurrent) {
+    data.currentStoryId = null;
+  }
+  save(data);
+  if (wasCurrent) {
+    createStory({});
+  }
+}
+
 function reopenStory(storyId, { model } = {}) {
   const data = load();
   const story = getStory(data, storyId);
@@ -211,5 +225,6 @@ module.exports = {
   addEntry,
   voteOnEnding,
   reopenStory,
+  deleteStory,
   listShelf
 };
