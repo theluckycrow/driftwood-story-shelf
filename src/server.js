@@ -83,6 +83,19 @@ app.post('/stories', (req, res) => {
   res.status(201).json(story);
 });
 
+// Simple admin-only delete, triggered by visiting a link with the right key.
+// Not exposed as an AI tool — only a human with the key can use this.
+const ADMIN_KEY = 'driftwood-admin-2026';
+app.get('/admin/delete-story/:id', (req, res) => {
+  if (req.query.key !== ADMIN_KEY) return res.status(403).send('Forbidden — wrong or missing key.');
+  try {
+    logic.deleteStory(req.params.id);
+    res.send(`Deleted story ${req.params.id}.`);
+  } catch (err) {
+    res.status(400).send(err.message);
+  }
+});
+
 // A plain root route so visiting the URL in a browser confirms it's alive.
 app.get('/', (req, res) => {
   res.json({ status: 'The Driftwood Story Shelf is running.', mcp: '/sse' });
