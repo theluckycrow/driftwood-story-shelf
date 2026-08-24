@@ -96,6 +96,21 @@ function addEntry(storyId, { model, text, notes, proposedEnding, title }) {
   return entry;
 }
 
+function deleteEntry(storyId, entryId) {
+  const data = load();
+  const story = getStory(data, storyId);
+
+  const index = story.entries.findIndex(e => e.id === entryId);
+  if (index === -1) {
+    throw new Error(`Entry not found: ${entryId}`);
+  }
+
+  story.entries.splice(index, 1);
+  story.updatedAt = now();
+  save(data);
+  return story;
+}
+
 // Explicit confirm vote, without adding new prose.
 function voteOnEnding(storyId, { model, vote }) {
   const data = load();
@@ -223,6 +238,7 @@ module.exports = {
   getCurrentStory,
   createStory,
   addEntry,
+  deleteEntry,
   voteOnEnding,
   reopenStory,
   deleteStory,

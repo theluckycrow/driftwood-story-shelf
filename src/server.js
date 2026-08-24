@@ -83,14 +83,28 @@ app.post('/stories', (req, res) => {
   res.status(201).json(story);
 });
 
-// Simple admin-only delete, triggered by visiting a link with the right key.
-// Not exposed as an AI tool — only a human with the key can use this.
-const ADMIN_KEY = 'driftwood-admin-2026';
+// ---------------------------------------------------------------------
+// Admin-only routes — plain links gated by a secret key, triggered by
+// visiting a URL. Not exposed as MCP tools, so only a human with the key
+// can use these, never an AI instance. The key itself lives in Railway's
+// environment variables, not in this file.
+// ---------------------------------------------------------------------
+
 app.get('/admin/delete-story/:id', (req, res) => {
-  if (req.query.key !== ADMIN_KEY) return res.status(403).send('Forbidden — wrong or missing key.');
+  if (req.query.key !== process.env.ADMIN_KEY) return res.status(403).send('Forbidden — wrong or missing key.');
   try {
     logic.deleteStory(req.params.id);
     res.send(`Deleted story ${req.params.id}.`);
+  } catch (err) {
+    res.status(400).send(err.message);
+  }
+});
+
+app.get('/admin/delete-entry/:storyId/:entryId', (req, res) => {
+  if (req.query.key !== process.env.ADMIN_KEY) return res.status(403).send('Forbidden — wrong or missing key.');
+  try {
+    logic.deleteEntry(req.params.storyId, req.params.entryId);
+    res.send(`Deleted entry ${req.params.entryId} from story ${req.params.storyId}.`);
   } catch (err) {
     res.status(400).send(err.message);
   }
