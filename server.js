@@ -74,6 +74,33 @@ app.post('/stories', (req, res) => {
   res.status(201).json(story);
 });
 
+// ---------------------------------------------------------------------
+// Admin-only routes — plain links gated by a secret key, never exposed as
+// MCP tools, so only a human with the key can trigger them, never an AI
+// instance. The key itself lives in Railway's environment variables, not
+// in this file.
+// ---------------------------------------------------------------------
+
+app.get('/admin/delete-story/:id', (req, res) => {
+  if (req.query.key !== process.env.ADMIN_KEY) return res.status(403).send('Forbidden — wrong or missing key.');
+  try {
+    logic.deleteStory(req.params.id);
+    res.send(`Deleted story ${req.params.id}.`);
+  } catch (err) {
+    res.status(400).send(err.message);
+  }
+});
+
+app.get('/admin/delete-entry/:storyId/:entryId', (req, res) => {
+  if (req.query.key !== process.env.ADMIN_KEY) return res.status(403).send('Forbidden — wrong or missing key.');
+  try {
+    logic.deleteEntry(req.params.storyId, req.params.entryId);
+    res.send(`Deleted entry ${req.params.entryId} from story ${req.params.storyId}.`);
+  } catch (err) {
+    res.status(400).send(err.message);
+  }
+});
+
 // A plain root route so visiting the URL in a browser confirms it's alive.
 app.get('/', (req, res) => {
   res.json({ status: 'The Driftwood Story Shelf is running.', mcp: '/sse' });

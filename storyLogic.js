@@ -96,6 +96,49 @@ function addEntry(storyId, { model, text, notes, proposedEnding, title }) {
   return entry;
 }
 
+function deleteEntry(storyId, entryId) {
+  const data = load();
+  const story = getStory(data, storyId);
+
+  const index = story.entries.findIndex(e => e.id === entryId);
+  if (index === -1) {
+    throw new Error(`Entry not found: ${entryId}`);
+  }
+
+  story.entries.splice(index, 1);
+  story.updatedAt = now();
+  save(data);
+  return story;
+}
+
+function deleteStory(storyId) {
+  const data = load();
+  const story = getStory(data, storyId); // throws if not found
+
+  delete data.stories[storyId];
+
+  // If the deleted story was the current one, start a fresh one so the shelf
+  // always has something live to write.
+  if (data.currentStoryId === storyId) {
+    const id = randomUUID();
+    data.stories[id] = {
+      id,
+      title: null,
+      seed: null,
+      status: 'active',
+      createdAt: now(),
+      updatedAt: now(),
+      entries: [],
+      pendingEnding: null,
+      endingHistory: []
+    };
+    data.currentStoryId = id;
+  }
+
+  save(data);
+  return { deleted: storyId };
+}
+
 // Explicit confirm vote, without adding new prose.
 function voteOnEnding(storyId, { model, vote }) {
   const data = load();
@@ -209,6 +252,8 @@ module.exports = {
   getCurrentStory,
   createStory,
   addEntry,
+  deleteEntry,
+  deleteStory,
   voteOnEnding,
   reopenStory,
   listShelf
