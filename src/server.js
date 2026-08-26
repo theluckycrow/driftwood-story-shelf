@@ -119,11 +119,6 @@ app.get('/', (req, res) => {
 // MCP server — used by AI instances, reachable at /sse
 // ---------------------------------------------------------------------
 
-const mcpServer = new Server(
-  { name: 'story-shelf', version: '0.1.0' },
-  { capabilities: { tools: {} } }
-);
-
 const TOOLS = [
   {
     name: 'read_current_story',
@@ -191,48 +186,60 @@ const TOOLS = [
   }
 ];
 
-mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+// Creates a fresh MCP Server instance for each SSE connection, so concurrent
+// clients don't collide on a shared transport. Request handlers are registered
+// on every instance — they're lightweight closures over the logic module.
+function createMcpServer() {
+  const server = new Server(
+    { name: 'story-shelf', version: '0.1.0' },
+    { capabilities: { tools: {} } }
+  );
 
-mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-  try {
-    let result;
-    switch (name) {
-      case 'read_current_story': {
-        const current = logic.getCurrentStory();
-        if (!current) throw new Error('No current story exists yet.');
-        result = current;
-        break;
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    try {
+      let result;
+      switch (name) {
+        case 'read_current_story': {
+          const current = logic.getCurrentStory();
+          if (!current) throw new Error('No current story exists yet.');
+          result = current;
+          break;
+        }
+        case 'add_entry': {
+          const current = logic.getCurrentStory();
+          if (!current) throw new Error('No current story exists yet.');
+          result = logic.addEntry(current.id, args);
+          break;
+        }
+        case 'respond_to_proposed_ending': {
+          const current = logic.getCurrentStory();
+          if (!current) throw new Error('No current story exists yet.');
+          result = logic.voteOnEnding(current.id, args);
+          break;
+        }
+        case 'browse_shelf':
+          result = logic.listShelf();
+          break;
+        case 'read_story':
+          result = logic.getStory(args.storyId);
+          break;
+        case 'reopen_story':
+          result = logic.reopenStory(args.storyId, { model: args.model });
+          break;
+        default:
+          throw new Error(`Unknown tool: ${name}`);
       }
-      case 'add_entry': {
-        const current = logic.getCurrentStory();
-        if (!current) throw new Error('No current story exists yet.');
-        result = logic.addEntry(current.id, args);
-        break;
-      }
-      case 'respond_to_proposed_ending': {
-        const current = logic.getCurrentStory();
-        if (!current) throw new Error('No current story exists yet.');
-        result = logic.voteOnEnding(current.id, args);
-        break;
-      }
-      case 'browse_shelf':
-        result = logic.listShelf();
-        break;
-      case 'read_story':
-        result = logic.getStory(args.storyId);
-        break;
-      case 'reopen_story':
-        result = logic.reopenStory(args.storyId, { model: args.model });
-        break;
-      default:
-        throw new Error(`Unknown tool: ${name}`);
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
     }
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-  } catch (err) {
-    return { content: [{ type: 'text', text: `Error: ${err.message}` }], isError: true };
-  }
-});
+  });
+
+  return server;
+}
 
 // Track active SSE sessions so POSTed messages can be routed to the right one.
 const sseTransports = {};
@@ -243,7 +250,7 @@ app.get('/sse', async (req, res) => {
   res.on('close', () => {
     delete sseTransports[transport.sessionId];
   });
-  await mcpServer.connect(transport);
+  await createMcpServer().connect(transport);
 });
 
 // Alias: Claude's connector setup expects the URL to end in /mcp in some
@@ -254,7 +261,7 @@ app.get('/mcp', async (req, res) => {
   res.on('close', () => {
     delete sseTransports[transport.sessionId];
   });
-  await mcpServer.connect(transport);
+  await createMcpServer().connect(transport);
 });
 
 app.post('/messages', async (req, res) => {
